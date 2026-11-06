@@ -1,0 +1,3 @@
+Coloque aqui os prints e o GIF/vídeo do app funcionando
+(ex.: print-permissao.png, print-notificacao.png, demo.gif)
+e referencie no README.md.

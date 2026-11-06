@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lava-Rápido Express</string>
+    <string name="title_activity_main">Lava-Rápido Express</string>
+    <string name="package_name">com.guiconst.lavarapidoexpress</string>
+    <string name="custom_url_scheme">com.guiconst.lavarapidoexpress</string>
+</resources>
