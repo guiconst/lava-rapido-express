@@ -1,14 +1,25 @@
 import { useEffect, useState } from "react";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import "./App.css";
 
 const TITULO = "Lava-Rápido Express";
 const ID_INICIO = 1;
 const ID_PRONTO = 100;
-const ATRASO_MS = 15 * 1000;
+const ATRASO_S = 15;
+
+const ROTULO_PERMISSAO = {
+  granted: { texto: "Permitidas", classe: "ok" },
+  denied: { texto: "Negadas", classe: "erro" },
+  prompt: { texto: "Não solicitadas", classe: "aviso" },
+  "prompt-with-rationale": { texto: "Não solicitadas", classe: "aviso" },
+};
 
 export default function App() {
-  const [permissao, setPermissao] = useState("desconhecida");
+  const [permissao, setPermissao] = useState("prompt");
   const [pendentes, setPendentes] = useState(0);
+  const [fim, setFim] = useState(null); // timestamp do fim da lavagem
+  const [restante, setRestante] = useState(0);
+  const [fase, setFase] = useState("parado"); // parado | lavando | pronto
   const [status, setStatus] = useState({ tipo: "info", texto: "Pronto para começar." });
 
   const info = (texto) => setStatus({ tipo: "info", texto });
@@ -20,10 +31,8 @@ export default function App() {
     try {
       const { notifications } = await LocalNotifications.getPending();
       setPendentes(notifications.length);
-      return notifications.length;
     } catch (e) {
       erro(`Não foi possível contar as pendentes: ${e.message}`);
-      return 0;
     }
   };
 
@@ -70,13 +79,15 @@ export default function App() {
             id: ID_PRONTO,
             title: TITULO,
             body: "Carro Pronto! Seu veículo foi totalmente higienizado!",
-            schedule: { at: new Date(Date.now() + ATRASO_MS) },
+            schedule: { at: new Date(Date.now() + ATRASO_S * 1000) },
           },
         ],
       });
-      ok("Lavagem iniciada. Aviso de 'Carro Pronto' em 15s.");
+      setFim(Date.now() + ATRASO_S * 1000);
+      setRestante(ATRASO_S);
+      setFase("lavando");
+      ok("Lavagem iniciada. Você será avisado quando o carro estiver pronto.");
       await contarPendentes();
-      setTimeout(contarPendentes, ATRASO_MS + 1000);
     } catch (e) {
       erro(`Erro ao agendar: ${e.message}`);
     }
@@ -85,12 +96,30 @@ export default function App() {
   const cancelarLavagem = async () => {
     try {
       await LocalNotifications.cancel({ notifications: [{ id: ID_PRONTO }] });
-      info("Agendamento cancelado.");
+      setFim(null);
+      setFase("parado");
+      info("Lavagem cancelada.");
       await contarPendentes();
     } catch (e) {
       erro(`Erro ao cancelar: ${e.message}`);
     }
   };
+
+  // Contagem regressiva visual
+  useEffect(() => {
+    if (!fim) return;
+    const t = setInterval(() => {
+      const s = Math.max(0, Math.ceil((fim - Date.now()) / 1000));
+      setRestante(s);
+      if (s === 0) {
+        setFase("pronto");
+        setFim(null);
+        ok("Carro pronto! Seu veículo foi totalmente higienizado.");
+        contarPendentes();
+      }
+    }, 250);
+    return () => clearInterval(t);
+  }, [fim]);
 
   useEffect(() => {
     verificarPermissao();
@@ -101,55 +130,62 @@ export default function App() {
     };
   }, []);
 
+  const progresso = fase === "pronto" ? 100 : fase === "lavando" ? ((ATRASO_S - restante) / ATRASO_S) * 100 : 0;
+  const perm = ROTULO_PERMISSAO[permissao] ?? { texto: permissao, classe: "aviso" };
+
   return (
-    <main className="app">
-      <style>{css}</style>
-      <h1>{TITULO} 🚿</h1>
-      <p className="sub">Aluno 10 · Notificações locais</p>
+    <div className="app">
+      <header>
+        <h1>{TITULO}</h1>
+        <p>Aluno 10 · Notificações locais</p>
+      </header>
 
-      <section>
-        <p>
-          Permissão: <strong>{permissao}</strong>
+      <main>
+        <section className="card lavagem">
+          <p className="estado">
+            {fase === "parado" && "Nenhuma lavagem em andamento"}
+            {fase === "lavando" && `Lavando... ${restante}s`}
+            {fase === "pronto" && "Carro pronto! ✨"}
+          </p>
+          <div className="barra" aria-hidden="true">
+            <div className="barra-fill" style={{ width: `${progresso}%` }} />
+          </div>
+          <div className="acoes">
+            <button className="primario" onClick={iniciarLavagem} disabled={fase === "lavando"}>
+              {fase === "pronto" ? "Lavar de novo" : "Iniciar lavagem"}
+            </button>
+            {fase === "lavando" && (
+              <button className="sec" onClick={cancelarLavagem}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        </section>
+
+        <section className="card linha">
+          <div>
+            <span className="rotulo">Notificações</span>
+            <span className={`chip ${perm.classe}`}>{perm.texto}</span>
+          </div>
+          <button className="sec pequeno" onClick={solicitarPermissao}>
+            Solicitar permissão
+          </button>
+        </section>
+
+        <section className="card linha">
+          <div>
+            <span className="rotulo">Pendentes</span>
+            <span className="numero">{pendentes}</span>
+          </div>
+          <button className="sec pequeno" onClick={contarPendentes}>
+            Contar pendentes
+          </button>
+        </section>
+
+        <p className={`status ${status.tipo}`} role="status">
+          {status.texto}
         </p>
-        <button onClick={solicitarPermissao}>Solicitar permissão</button>
-        <button onClick={verificarPermissao} className="sec">
-          Verificar
-        </button>
-      </section>
-
-      <section>
-        <button onClick={iniciarLavagem}>Iniciar lavagem</button>
-        <button onClick={cancelarLavagem} className="sec">
-          Cancelar agendamento
-        </button>
-      </section>
-
-      <section>
-        <p>
-          Notificações pendentes: <strong>{pendentes}</strong>
-        </p>
-        <button onClick={contarPendentes} className="sec">
-          Contar pendentes
-        </button>
-      </section>
-
-      <p className={`status ${status.tipo}`} role="status">
-        {status.texto}
-      </p>
-    </main>
+      </main>
+    </div>
   );
 }
-
-const css = `
-  .app { max-width: 420px; margin: 0 auto; padding: 24px 16px; font-family: system-ui, sans-serif; color: #111; }
-  h1 { font-size: 1.4rem; margin: 0; }
-  .sub { color: #666; margin: 4px 0 20px; }
-  section { border: 1px solid #ddd; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
-  section p { margin: 0 0 10px; }
-  button { background: #111; color: #fff; border: 0; border-radius: 8px; padding: 10px 14px; margin: 0 8px 0 0; font-size: 0.95rem; }
-  button.sec { background: #eee; color: #111; }
-  .status { padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; }
-  .status.info { background: #f2f2f2; }
-  .status.ok { background: #e6f6ea; color: #14532d; }
-  .status.erro { background: #fdeaea; color: #991b1b; }
-`;

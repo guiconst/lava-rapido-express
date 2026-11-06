@@ -11,7 +11,7 @@ Exercício designado: **Aluno 10 — Lava-Rápido Express**.
 - Ao tocar em **Iniciar lavagem**, dispara na hora a notificação "Lavagem iniciada".
 - Agenda a notificação **"Carro Pronto"** para 15 segundos depois (funciona com o app fechado).
 - **Desafio extra:** conta as notificações pendentes com `getPending()`.
-- Mostra mensagens de status e de erro na tela e permite cancelar o agendamento.
+- Mostra contagem regressiva da lavagem, mensagens de status e de erro, e permite cancelar o agendamento.
 
 ## Tecnologias
 
